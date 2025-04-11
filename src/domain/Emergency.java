@@ -1,7 +1,5 @@
 package domain;
 
-import java.sql.Timestamp;
-
 public class Emergency {
     private int id;
     private String city;
@@ -9,22 +7,16 @@ public class Emergency {
     private double latitude;
     private double longitude;
     private int quantity;
-    private boolean resolved;
-    private Timestamp timestamp;
 
-    public Emergency() {}
+    public Emergency(String city, String county, double latitude, double longitude, int quantity) {}
 
-    public Emergency(int id, String city, String county, double latitude, double longitude, int quantity, boolean resolved, Timestamp timestamp) {
-        this.id = id;
+    public Emergency(String city, String county, double latitude, double longitude, int quantity, boolean resolved,) {
         this.city = city;
         this.county = county;
         this.latitude = latitude;
         this.longitude = longitude;
         this.quantity = quantity;
-        this.resolved = resolved;
-        this.timestamp = timestamp;
     }
-
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
 
@@ -43,9 +35,4 @@ public class Emergency {
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; }
 
-    public boolean isResolved() { return resolved; }
-    public void setResolved(boolean resolved) { this.resolved = resolved; }
-
-    public Timestamp getTimestamp() { return timestamp; }
-    public void setTimestamp(Timestamp timestamp) { this.timestamp = timestamp; }
 }

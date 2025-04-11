@@ -1,7 +1,5 @@
 package domain;
 
-import java.sql.Timestamp;
-
 public class Dispatch {
     private int id;
     private String sourceCity;
@@ -9,18 +7,17 @@ public class Dispatch {
     private String targetCity;
     private String targetCounty;
     private int quantity;
-    private Timestamp timestamp;
 
-    public Dispatch() {}
 
-    public Dispatch(int id, String sourceCity, String sourceCounty, String targetCity, String targetCounty, int quantity, Timestamp timestamp) {
-        this.id = id;
+    public Dispatch(int id, String sourceCity, String sourceCounty, String targetCity, String targetCounty, int quantity) {}
+
+    public Dispatch(String sourceCity, String sourceCounty, String targetCity, String targetCounty, int quantity) {
         this.sourceCity = sourceCity;
         this.sourceCounty = sourceCounty;
         this.targetCity = targetCity;
         this.targetCounty = targetCounty;
         this.quantity = quantity;
-        this.timestamp = timestamp;
+
     }
 
     public int getId() { return id; }
@@ -41,6 +38,4 @@ public class Dispatch {
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; }
 
-    public Timestamp getTimestamp() { return timestamp; }
-    public void setTimestamp(Timestamp timestamp) { this.timestamp = timestamp; }
 }

@@ -1,4 +1,4 @@
-package Repository;
+package repository;
 
 import domain.ApiRequest;
 import org.apache.logging.log4j.LogManager;

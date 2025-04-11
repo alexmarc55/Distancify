@@ -1,4 +1,4 @@
-package Repository;
+package repository;
 
 import domain.Dispatch;
 import org.apache.logging.log4j.LogManager;
@@ -22,7 +22,7 @@ public class RepositoryDispatch implements IRepository<Dispatch, Integer> {
     @Override
     public Dispatch save(Dispatch entity) {
         logger.traceEntry("Saving dispatch: {}", entity);
-        String sql = "INSERT INTO dispatches(source_city, source_county, target_city, target_county, quantity, timestamp) VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO dispatches(source_city, source_county, target_city, target_county, quantity) VALUES (?, ?, ?, ?, ?)";
 
         try (Connection conn = jdbcUtils.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -32,7 +32,6 @@ public class RepositoryDispatch implements IRepository<Dispatch, Integer> {
             stmt.setString(3, entity.getTargetCity());
             stmt.setString(4, entity.getTargetCounty());
             stmt.setInt(5, entity.getQuantity());
-            stmt.setTimestamp(6, entity.getTimestamp());
 
             stmt.executeUpdate();
 
@@ -48,7 +47,7 @@ public class RepositoryDispatch implements IRepository<Dispatch, Integer> {
         }
 
         logger.trace("Saved dispatch: {}", entity);
-        logger.traceExit("Exiting...");
+        logger.traceExit("Exiting save()");
         return entity;
     }
 
@@ -70,8 +69,7 @@ public class RepositoryDispatch implements IRepository<Dispatch, Integer> {
                         rs.getString("source_county"),
                         rs.getString("target_city"),
                         rs.getString("target_county"),
-                        rs.getInt("quantity"),
-                        rs.getTimestamp("timestamp")
+                        rs.getInt("quantity")
                 );
                 logger.trace("Found dispatch: {}", dispatch);
                 logger.traceExit("Exiting findById()");
@@ -104,8 +102,7 @@ public class RepositoryDispatch implements IRepository<Dispatch, Integer> {
                         rs.getString("source_county"),
                         rs.getString("target_city"),
                         rs.getString("target_county"),
-                        rs.getInt("quantity"),
-                        rs.getTimestamp("timestamp")
+                        rs.getInt("quantity")
                 );
                 dispatches.add(dispatch);
             }
@@ -116,7 +113,7 @@ public class RepositoryDispatch implements IRepository<Dispatch, Integer> {
         }
 
         logger.trace("Fetched {} dispatches", dispatches.size());
-        logger.traceExit("Exiting...");
+        logger.traceExit("Exiting findAll()");
         return dispatches;
     }
 
@@ -137,13 +134,13 @@ public class RepositoryDispatch implements IRepository<Dispatch, Integer> {
         }
 
         logger.trace("Deleted dispatch with ID: {}", id);
-        logger.traceExit("Exiting...");
+        logger.traceExit("Exiting deleteById()");
     }
 
     @Override
     public Dispatch update(Dispatch entity) {
         logger.traceEntry("Updating dispatch: {}", entity);
-        String sql = "UPDATE dispatches SET source_city = ?, source_county = ?, target_city = ?, target_county = ?, quantity = ?, timestamp = ? WHERE id = ?";
+        String sql = "UPDATE dispatches SET source_city = ?, source_county = ?, target_city = ?, target_county = ?, quantity = ? WHERE id = ?";
 
         try (Connection conn = jdbcUtils.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -153,8 +150,7 @@ public class RepositoryDispatch implements IRepository<Dispatch, Integer> {
             stmt.setString(3, entity.getTargetCity());
             stmt.setString(4, entity.getTargetCounty());
             stmt.setInt(5, entity.getQuantity());
-            stmt.setTimestamp(6, entity.getTimestamp());
-            stmt.setInt(7, entity.getId());
+            stmt.setInt(6, entity.getId());
 
             stmt.executeUpdate();
 
@@ -164,7 +160,7 @@ public class RepositoryDispatch implements IRepository<Dispatch, Integer> {
         }
 
         logger.trace("Updated dispatch: {}", entity);
-        logger.traceExit("Exiting...");
+        logger.traceExit("Exiting update()");
         return entity;
     }
 }

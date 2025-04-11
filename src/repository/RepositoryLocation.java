@@ -1,4 +1,4 @@
-package Repository;
+package repository;
 
 import domain.Location;
 import org.apache.logging.log4j.LogManager;

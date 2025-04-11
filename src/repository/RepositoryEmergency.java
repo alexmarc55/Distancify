@@ -1,4 +1,4 @@
-package Repository;
+package repository;
 
 import domain.Emergency;
 import org.apache.logging.log4j.LogManager;
@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 
-public class RepositoryEmergency implements IRepository<Emergency, Integer> {
+public class RepositoryEmergency implements IRepository<Emergency, String> {
 
     private final JdbcUtils jdbcUtils;
     protected static final Logger logger = LogManager.getLogger();
@@ -22,26 +22,18 @@ public class RepositoryEmergency implements IRepository<Emergency, Integer> {
     @Override
     public Emergency save(Emergency entity) {
         logger.traceEntry("Saving emergency: {}", entity);
-        String sql = "INSERT INTO emergencies(city, county, latitude, longitude, quantity, resolved, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO emergencies(city, county, latitude, longitude, quantity) VALUES (?, ?, ?, ?, ?)";
 
         try (Connection conn = jdbcUtils.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, entity.getCity());
             stmt.setString(2, entity.getCounty());
             stmt.setDouble(3, entity.getLatitude());
             stmt.setDouble(4, entity.getLongitude());
             stmt.setInt(5, entity.getQuantity());
-            stmt.setBoolean(6, entity.isResolved());
-            stmt.setTimestamp(7, entity.getTimestamp());
 
             stmt.executeUpdate();
-
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    entity.setId(generatedKeys.getInt(1));
-                }
-            }
 
         } catch (SQLException e) {
             logger.error("Error saving emergency: {}", entity, e);
@@ -49,43 +41,40 @@ public class RepositoryEmergency implements IRepository<Emergency, Integer> {
         }
 
         logger.trace("Saved emergency: {}", entity);
-        logger.traceExit("Exiting...");
+        logger.traceExit("Exiting save()");
         return entity;
     }
 
     @Override
-    public Optional<Emergency> findById(Integer id) {
-        logger.traceEntry("Finding emergency by ID: {}", id);
-        String sql = "SELECT * FROM emergencies WHERE id = ?";
+    public Optional<Emergency> findById(String city) {
+        logger.traceEntry("Finding emergency by city: {}", city);
+        String sql = "SELECT * FROM emergencies WHERE city = ? LIMIT 1"; // assumes city is unique or takes first
 
         try (Connection conn = jdbcUtils.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setInt(1, id);
+            stmt.setString(1, city);
             ResultSet rs = stmt.executeQuery();
 
             if (rs.next()) {
                 Emergency emergency = new Emergency(
-                        rs.getInt("id"),
                         rs.getString("city"),
                         rs.getString("county"),
                         rs.getDouble("latitude"),
                         rs.getDouble("longitude"),
-                        rs.getInt("quantity"),
-                        rs.getBoolean("resolved"),
-                        rs.getTimestamp("timestamp")
+                        rs.getInt("quantity")
                 );
                 logger.trace("Found emergency: {}", emergency);
-                logger.traceExit("Exiting...");
+                logger.traceExit("Exiting findById()");
                 return Optional.of(emergency);
             }
 
         } catch (SQLException e) {
-            logger.error("Error finding emergency with ID: {}", id, e);
-            throw new RuntimeException("Failed to find emergency: " + e.getMessage(), e);
+            logger.error("Error finding emergency by city: {}", city, e);
+            throw new RuntimeException("Failed to find emergency", e);
         }
 
-        logger.traceExit("No emergency found with ID: {}", id);
+        logger.traceExit("No emergency found for city: {}", city);
         return Optional.empty();
     }
 
@@ -101,14 +90,11 @@ public class RepositoryEmergency implements IRepository<Emergency, Integer> {
 
             while (rs.next()) {
                 Emergency emergency = new Emergency(
-                        rs.getInt("id"),
                         rs.getString("city"),
                         rs.getString("county"),
                         rs.getDouble("latitude"),
                         rs.getDouble("longitude"),
-                        rs.getInt("quantity"),
-                        rs.getBoolean("resolved"),
-                        rs.getTimestamp("timestamp")
+                        rs.getInt("quantity")
                 );
                 emergencies.add(emergency);
             }
@@ -119,56 +105,52 @@ public class RepositoryEmergency implements IRepository<Emergency, Integer> {
         }
 
         logger.trace("Fetched {} emergencies", emergencies.size());
-        logger.traceExit("Exiting...");
+        logger.traceExit("Exiting findAll()");
         return emergencies;
     }
 
     @Override
-    public void deleteById(Integer id) {
-        logger.traceEntry("Deleting emergency with ID: {}", id);
-        String sql = "DELETE FROM emergencies WHERE id = ?";
+    public void deleteById(String city) {
+        logger.traceEntry("Deleting emergency in city: {}", city);
+        String sql = "DELETE FROM emergencies WHERE city = ?";
 
         try (Connection conn = jdbcUtils.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setInt(1, id);
+            stmt.setString(1, city);
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            logger.error("Error deleting emergency with ID: {}", id, e);
-            throw new RuntimeException("Failed to delete emergency: " + e.getMessage(), e);
+            logger.error("Error deleting emergency in city: {}", city, e);
+            throw new RuntimeException("Failed to delete emergency", e);
         }
 
-        logger.trace("Deleted emergency with ID: {}", id);
-        logger.traceExit("Exiting...");
+        logger.trace("Deleted emergency in city: {}", city);
+        logger.traceExit("Exiting deleteById()");
     }
 
     @Override
     public Emergency update(Emergency entity) {
         logger.traceEntry("Updating emergency: {}", entity);
-        String sql = "UPDATE emergencies SET city = ?, county = ?, latitude = ?, longitude = ?, quantity = ?, resolved = ?, timestamp = ? WHERE id = ?";
+        String sql = "UPDATE emergencies SET county = ?, latitude = ?, longitude = ?, quantity = ? WHERE city = ?";
 
         try (Connection conn = jdbcUtils.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setString(1, entity.getCity());
-            stmt.setString(2, entity.getCounty());
-            stmt.setDouble(3, entity.getLatitude());
-            stmt.setDouble(4, entity.getLongitude());
-            stmt.setInt(5, entity.getQuantity());
-            stmt.setBoolean(6, entity.isResolved());
-            stmt.setTimestamp(7, entity.getTimestamp());
-            stmt.setInt(8, entity.getId());
+            stmt.setString(1, entity.getCounty());
+            stmt.setDouble(2, entity.getLatitude());
+            stmt.setDouble(3, entity.getLongitude());
+            stmt.setInt(4, entity.getQuantity());
+            stmt.setString(5, entity.getCity());
 
             stmt.executeUpdate();
 
         } catch (SQLException e) {
             logger.error("Error updating emergency: {}", entity, e);
-            throw new RuntimeException("Failed to update emergency: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to update emergency", e);
         }
 
         logger.trace("Updated emergency: {}", entity);
-        logger.traceExit("Exiting...");
+        logger.traceExit("Exiting update()");
         return entity;
     }
 }
