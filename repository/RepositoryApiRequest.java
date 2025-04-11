@@ -1,6 +1,8 @@
 package Repository;
 
 import domain.ApiRequest;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -11,6 +13,7 @@ import java.util.Properties;
 public class RepositoryApiRequest implements IRepository<ApiRequest, Integer> {
 
     private final JdbcUtils jdbcUtils;
+    protected static final Logger logger = LogManager.getLogger();
 
     public RepositoryApiRequest(Properties props) {
         this.jdbcUtils = new JdbcUtils(props);
@@ -18,6 +21,7 @@ public class RepositoryApiRequest implements IRepository<ApiRequest, Integer> {
 
     @Override
     public ApiRequest save(ApiRequest entity) {
+        logger.traceEntry("Saving API request: {}", entity);
         String sql = "INSERT INTO api_requests(endpoint, method, payload, timestamp, status, response) VALUES (?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = jdbcUtils.getConnection();
@@ -39,15 +43,20 @@ public class RepositoryApiRequest implements IRepository<ApiRequest, Integer> {
             }
 
         } catch (SQLException e) {
+            logger.error("Error saving API request: {}", entity, e);
             throw new RuntimeException("Failed to save API request: " + e.getMessage(), e);
         }
 
+        logger.trace("Saved API request: {}", entity);
+        logger.traceExit("Exiting...");
         return entity;
     }
 
     @Override
     public Optional<ApiRequest> findById(Integer id) {
+        logger.traceEntry("Finding API request by ID: {}", id);
         String sql = "SELECT * FROM api_requests WHERE id = ?";
+
         try (Connection conn = jdbcUtils.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -64,17 +73,23 @@ public class RepositoryApiRequest implements IRepository<ApiRequest, Integer> {
                         rs.getString("status"),
                         rs.getString("response")
                 );
+                logger.trace("Found API request: {}", req);
+                logger.traceExit("Exiting findById()");
                 return Optional.of(req);
             }
+
         } catch (SQLException e) {
+            logger.error("Error finding API request with ID: {}", id, e);
             throw new RuntimeException("Failed to find API request: " + e.getMessage(), e);
         }
 
+        logger.traceExit("No API request found with ID: {}", id);
         return Optional.empty();
     }
 
     @Override
     public List<ApiRequest> findAll() {
+        logger.traceEntry("Fetching all API requests");
         List<ApiRequest> requests = new ArrayList<>();
         String sql = "SELECT * FROM api_requests";
 
@@ -94,15 +109,20 @@ public class RepositoryApiRequest implements IRepository<ApiRequest, Integer> {
                 );
                 requests.add(req);
             }
+
         } catch (SQLException e) {
+            logger.error("Error fetching API requests", e);
             throw new RuntimeException("Failed to fetch API requests: " + e.getMessage(), e);
         }
 
+        logger.trace("Fetched {} API requests", requests.size());
+        logger.traceExit("Exiting...");
         return requests;
     }
 
     @Override
     public void deleteById(Integer id) {
+        logger.traceEntry("Deleting API request with ID: {}", id);
         String sql = "DELETE FROM api_requests WHERE id = ?";
 
         try (Connection conn = jdbcUtils.getConnection();
@@ -112,12 +132,17 @@ public class RepositoryApiRequest implements IRepository<ApiRequest, Integer> {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
+            logger.error("Error deleting API request with ID: {}", id, e);
             throw new RuntimeException("Failed to delete API request: " + e.getMessage(), e);
         }
+
+        logger.trace("Deleted API request with ID: {}", id);
+        logger.traceExit("Exiting...");
     }
 
     @Override
     public ApiRequest update(ApiRequest entity) {
+        logger.traceEntry("Updating API request: {}", entity);
         String sql = "UPDATE api_requests SET endpoint = ?, method = ?, payload = ?, timestamp = ?, status = ?, response = ? WHERE id = ?";
 
         try (Connection conn = jdbcUtils.getConnection();
@@ -134,9 +159,12 @@ public class RepositoryApiRequest implements IRepository<ApiRequest, Integer> {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
+            logger.error("Error updating API request: {}", entity, e);
             throw new RuntimeException("Failed to update API request: " + e.getMessage(), e);
         }
 
+        logger.trace("Updated API request: {}", entity);
+        logger.traceExit("Exiting...");
         return entity;
     }
 }
