@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 
 const Header = () => {
   return (
-    <header className="bg-white shadow-md py-4 px-8 flex items-center justify-between">
+    <header className="bg-white shadow-md py-2 px-8 flex items-center justify-between fixed w-full z-500">
       {/* Left side: Logo and Home */}
       <div className="flex items-center space-x-6">
         <img 
-          src="../images/logo.png" 
+          src="./images/logo.png" 
           alt="Logo" 
           className="h-10 w-auto"
         />

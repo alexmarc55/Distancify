@@ -15,14 +15,14 @@ const hospitalIcon = new L.Icon({
 const HospitalMarker = ({ hospital, onAmbulanceDragEnd }) => {
   return (
     <Marker
-      position={[hospital.latitude, hospital.longitude]}
+      position={[hospital.latitude, hospital.longitude - 0.1]}
       icon={hospitalIcon}
       draggable={hospital.quantity > 0}
       eventHandlers={{
         dragend: (e) => onAmbulanceDragEnd(hospital, e),
       }}
     >
-      <Tooltip direction="bottom" offset={[0, 10]} permanent>
+      <Tooltip direction="bottom" offset={[0, 30]} permanent>
         {`${hospital.city}, ${hospital.county} – Ambulances: ${hospital.quantity}`}
       </Tooltip>
     </Marker>
