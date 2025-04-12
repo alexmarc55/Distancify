@@ -10,18 +10,47 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
 
-import Networking.EmulatorNetworking;
-import Networking.FrontendNetworking;
-import Service.EmulatorService;
+import Networking.*;
+import Service.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import repository.*;
 
 public class Main {
+    private static Properties props = new Properties();
+
     public static void main(String[] args) throws Exception {
+        try {
+            props.load(new FileReader("db.config"));
+        } catch (IOException e) {
+            System.out.println("Cannot find db.config: " + e);
+        }
         HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
-        EmulatorService emulatorService = new EmulatorService();
+
+        //Repository
+        RepositoryLocation repositoryLocation = new RepositoryLocation(props);
+        RepositoryEmergency repositoryEmergency = new RepositoryEmergency(props);
+        RepositoryDispatch repositoryDispatch = new RepositoryDispatch(props);
+        RepositoryAmbulances repositoryAmbulances = new RepositoryAmbulances(props);
+        RepositoryFire repositoryFire = new RepositoryFire(props);
+        RepositoryPolice repositoryPolice = new RepositoryPolice(props);
+
+
+        //Emulator Networking
+        EmulatorNetworking emulatorNetworking = new EmulatorNetworking();
+        EmulatorNetworkingAmbulances emulatorNetworkingAmbulances = new EmulatorNetworkingAmbulances();
+        EmulatorNetworkingPolice emulatorNetworkingPolice = new EmulatorNetworkingPolice();
+        EmulatorNetworkingFire emulatorNetworkingFire = new EmulatorNetworkingFire();
+
+
+        //Service
+        EmulatorService emulatorService = new EmulatorService(emulatorNetworking, emulatorNetworkingAmbulances, emulatorNetworkingPolice, emulatorNetworkingFire);
+        LocationService locationService = new LocationService(repositoryLocation, emulatorNetworking);
+        AmbulanceService ambulanceService = new AmbulanceService(repositoryAmbulances, emulatorNetworking);
+        FireService fireService = new FireService(repositoryFire, emulatorNetworking);
+        PoliceService policeService = new PoliceService(repositoryPolice, emulatorNetworking);
 
         // Definește un handler pentru ruta "/api/emergency"
         server.createContext("/api/emergency", new HttpHandler() {
@@ -43,7 +72,6 @@ public class Main {
                 try {
                     emergencyData = emulatorService.getNextEmergencyForFrontend();
                     System.out.println("Next Emergency for Frontend: " + emergencyData);
-
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -67,6 +95,396 @@ public class Main {
                 }
             }
         });
+
+        server.createContext("/api/ambulances", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                // Permitem cereri din orice origine (poți înlocui "*" cu adresa frontend-ului tău pentru securitate mai mare)
+                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+
+                // Dacă este o cerere OPTIONS (pentru CORS preflight)
+                if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                    exchange.sendResponseHeaders(200, -1);  // 200 OK, fără corp de răspuns
+                    return;
+                }
+
+                // Creăm o listă pentru datele despre ambulante
+                List<Map<String, Object>> ambulances = null;
+                try {
+                    ambulances = emulatorNetworking.getAmbulances();
+                    System.out.println("Ambulances for Frontend: " + ambulances);
+
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+                ObjectMapper objectMapper = new ObjectMapper();
+                String jsonResponse;
+
+                if (ambulances == null || ambulances.isEmpty()) {
+                    Map<String, Object> noData = new HashMap<>();
+                    noData.put("message", "No ambulances available");
+                    jsonResponse = objectMapper.writeValueAsString(noData);
+                } else {
+                    jsonResponse = objectMapper.writeValueAsString(ambulances);
+                }
+
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
+
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(jsonResponse.getBytes());
+                }
+            }
+        });
+
+        server.createContext("/api/police", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                // Permitem cereri din orice origine (poți înlocui "*" cu adresa frontend-ului tău pentru securitate mai mare)
+                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+
+                // Dacă este o cerere OPTIONS (pentru CORS preflight)
+                if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                    exchange.sendResponseHeaders(200, -1);  // 200 OK, fără corp de răspuns
+                    return;
+                }
+
+                // Creăm o listă pentru datele despre ambulante
+                List<Map<String, Object>> police = null;
+                try {
+                    police = emulatorNetworking.getPolice();
+                    System.out.println("Police for Frontend: " + police);
+
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+                ObjectMapper objectMapper = new ObjectMapper();
+                String jsonResponse;
+
+                if (police == null || police.isEmpty()) {
+                    Map<String, Object> noData = new HashMap<>();
+                    noData.put("message", "No police available");
+                    jsonResponse = objectMapper.writeValueAsString(noData);
+                } else {
+                    jsonResponse = objectMapper.writeValueAsString(police);
+                }
+
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
+
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(jsonResponse.getBytes());
+                }
+            }
+        });
+
+        server.createContext("/api/fire", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                // Permitem cereri din orice origine (poți înlocui "*" cu adresa frontend-ului tău pentru securitate mai mare)
+                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+
+                // Dacă este o cerere OPTIONS (pentru CORS preflight)
+                if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                    exchange.sendResponseHeaders(200, -1);  // 200 OK, fără corp de răspuns
+                    return;
+                }
+
+                // Creăm o listă pentru datele despre ambulante
+                List<Map<String, Object>> fire = null;
+                try {
+                    fire = emulatorNetworking.getFire();
+                    System.out.println("Fire for Frontend: " + fire);
+
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+                ObjectMapper objectMapper = new ObjectMapper();
+                String jsonResponse;
+
+                if (fire == null || fire.isEmpty()) {
+                    Map<String, Object> noData = new HashMap<>();
+                    noData.put("message", "No police available");
+                    jsonResponse = objectMapper.writeValueAsString(noData);
+                } else {
+                    jsonResponse = objectMapper.writeValueAsString(fire);
+                }
+
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
+
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(jsonResponse.getBytes());
+                }
+            }
+        });
+
+        server.createContext("/api/dispatch/ambulance", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                // Permitem cereri din orice origine (poți înlocui "*" cu adresa frontend-ului tău pentru securitate mai mare)
+                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+
+                // Dacă este o cerere OPTIONS (pentru CORS preflight)
+                if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                    exchange.sendResponseHeaders(200, -1);  // 200 OK, fără corp de răspuns
+                    return;
+                }
+
+                // Verificăm dacă metoda este POST
+                if ("POST".equals(exchange.getRequestMethod())) {
+                    // Citim corpul cererii
+                    InputStreamReader reader = new InputStreamReader(exchange.getRequestBody(), "UTF-8");
+                    BufferedReader bufferedReader = new BufferedReader(reader);
+
+                    // Citim întregul conținut al corpului cererii
+                    StringBuilder requestBody = new StringBuilder();
+                    String line;
+                    while ((line = bufferedReader.readLine()) != null) {
+                        requestBody.append(line);
+                    }
+
+                    // Parseați corpul cererii JSON într-un obiect Map
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    Map<String, Object> requestData = null;
+                    try {
+                        requestData = objectMapper.readValue(requestBody.toString(), Map.class);
+                    } catch (IOException e) {
+                        // Dacă nu reușim să parsăm JSON-ul, returnăm un mesaj de eroare
+                        String errorResponse = "{\"message\": \"Invalid JSON format\"}";
+                        exchange.getResponseHeaders().set("Content-Type", "application/json");
+                        exchange.sendResponseHeaders(400, errorResponse.getBytes().length);  // 400 Bad Request
+                        try (OutputStream os = exchange.getResponseBody()) {
+                            os.write(errorResponse.getBytes());
+                        }
+                        return;
+                    }
+
+                    // Extragem datele necesare din requestData
+                    String sourceCounty = (String) requestData.get("sourceCounty");
+                    String sourceCity = (String) requestData.get("sourceCity");
+                    String targetCounty = (String) requestData.get("targetCounty");
+                    String targetCity = (String) requestData.get("targetCity");
+                    Integer quantity = (Integer) requestData.get("quantity");
+
+                    // Verificăm dacă există valori valabile pentru toate câmpurile
+                    if (sourceCounty == null || sourceCity == null || targetCounty == null || targetCity == null || quantity == null) {
+                        String errorResponse = "{\"message\": \"Missing required fields\"}";
+                        exchange.getResponseHeaders().set("Content-Type", "application/json");
+                        exchange.sendResponseHeaders(400, errorResponse.getBytes().length);  // 400 Bad Request
+                        try (OutputStream os = exchange.getResponseBody()) {
+                            os.write(errorResponse.getBytes());
+                        }
+                        return;
+                    }
+
+                    // Instanțiem emulatorul și trimitem notificarea de dispatch
+                    emulatorNetworkingAmbulances.sendDispatchNotification(sourceCounty, sourceCity, targetCounty, targetCity, quantity);
+                    emulatorService.deleteFromPending(targetCounty, targetCity, quantity, "Medical");
+                    // Pregătim răspunsul
+                    String jsonResponse = "{\"message\": \"Dispatch received successfully\"}";
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);  // 200 OK
+
+                    // Trimitim răspunsul înapoi clientului
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(jsonResponse.getBytes());
+                    }
+                } else {
+                    // Dacă metoda nu este POST, returnăm un mesaj de eroare
+                    String errorResponse = "{\"message\": \"Only POST method is supported for this endpoint\"}";
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(405, errorResponse.getBytes().length);  // 405 Method Not Allowed
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(errorResponse.getBytes());
+                    }
+                }
+            }
+        });
+
+        server.createContext("/api/dispatch/police", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                // Permitem cereri din orice origine (poți înlocui "*" cu adresa frontend-ului tău pentru securitate mai mare)
+                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+
+                // Dacă este o cerere OPTIONS (pentru CORS preflight)
+                if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                    exchange.sendResponseHeaders(200, -1);  // 200 OK, fără corp de răspuns
+                    return;
+                }
+
+                // Verificăm dacă metoda este POST
+                if ("POST".equals(exchange.getRequestMethod())) {
+                    // Citim corpul cererii
+                    InputStreamReader reader = new InputStreamReader(exchange.getRequestBody(), "UTF-8");
+                    BufferedReader bufferedReader = new BufferedReader(reader);
+
+                    // Citim întregul conținut al corpului cererii
+                    StringBuilder requestBody = new StringBuilder();
+                    String line;
+                    while ((line = bufferedReader.readLine()) != null) {
+                        requestBody.append(line);
+                    }
+
+                    // Parseați corpul cererii JSON într-un obiect Map
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    Map<String, Object> requestData = null;
+                    try {
+                        requestData = objectMapper.readValue(requestBody.toString(), Map.class);
+                    } catch (IOException e) {
+                        // Dacă nu reușim să parsăm JSON-ul, returnăm un mesaj de eroare
+                        String errorResponse = "{\"message\": \"Invalid JSON format\"}";
+                        exchange.getResponseHeaders().set("Content-Type", "application/json");
+                        exchange.sendResponseHeaders(400, errorResponse.getBytes().length);  // 400 Bad Request
+                        try (OutputStream os = exchange.getResponseBody()) {
+                            os.write(errorResponse.getBytes());
+                        }
+                        return;
+                    }
+
+                    // Extragem datele necesare din requestData
+                    String sourceCounty = (String) requestData.get("sourceCounty");
+                    String sourceCity = (String) requestData.get("sourceCity");
+                    String targetCounty = (String) requestData.get("targetCounty");
+                    String targetCity = (String) requestData.get("targetCity");
+                    Integer quantity = (Integer) requestData.get("quantity");
+
+                    // Verificăm dacă există valori valabile pentru toate câmpurile
+                    if (sourceCounty == null || sourceCity == null || targetCounty == null || targetCity == null || quantity == null) {
+                        String errorResponse = "{\"message\": \"Missing required fields\"}";
+                        exchange.getResponseHeaders().set("Content-Type", "application/json");
+                        exchange.sendResponseHeaders(400, errorResponse.getBytes().length);  // 400 Bad Request
+                        try (OutputStream os = exchange.getResponseBody()) {
+                            os.write(errorResponse.getBytes());
+                        }
+                        return;
+                    }
+
+                    // Instanțiem emulatorul și trimitem notificarea de dispatch
+                    emulatorNetworkingPolice.sendDispatchNotification(sourceCounty, sourceCity, targetCounty, targetCity, quantity);
+                    emulatorService.deleteFromPending(targetCounty, targetCity, quantity, "Police");
+
+                    // Pregătim răspunsul
+                    String jsonResponse = "{\"message\": \"Dispatch received successfully\"}";
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);  // 200 OK
+
+                    // Trimitim răspunsul înapoi clientului
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(jsonResponse.getBytes());
+                    }
+                } else {
+                    // Dacă metoda nu este POST, returnăm un mesaj de eroare
+                    String errorResponse = "{\"message\": \"Only POST method is supported for this endpoint\"}";
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(405, errorResponse.getBytes().length);  // 405 Method Not Allowed
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(errorResponse.getBytes());
+                    }
+                }
+            }
+        });
+
+        server.createContext("/api/dispatch/fire", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                // Permitem cereri din orice origine (poți înlocui "*" cu adresa frontend-ului tău pentru securitate mai mare)
+                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+
+                // Dacă este o cerere OPTIONS (pentru CORS preflight)
+                if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                    exchange.sendResponseHeaders(200, -1);  // 200 OK, fără corp de răspuns
+                    return;
+                }
+
+                // Verificăm dacă metoda este POST
+                if ("POST".equals(exchange.getRequestMethod())) {
+                    // Citim corpul cererii
+                    InputStreamReader reader = new InputStreamReader(exchange.getRequestBody(), "UTF-8");
+                    BufferedReader bufferedReader = new BufferedReader(reader);
+
+                    // Citim întregul conținut al corpului cererii
+                    StringBuilder requestBody = new StringBuilder();
+                    String line;
+                    while ((line = bufferedReader.readLine()) != null) {
+                        requestBody.append(line);
+                    }
+
+                    // Parseați corpul cererii JSON într-un obiect Map
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    Map<String, Object> requestData = null;
+                    try {
+                        requestData = objectMapper.readValue(requestBody.toString(), Map.class);
+                    } catch (IOException e) {
+                        // Dacă nu reușim să parsăm JSON-ul, returnăm un mesaj de eroare
+                        String errorResponse = "{\"message\": \"Invalid JSON format\"}";
+                        exchange.getResponseHeaders().set("Content-Type", "application/json");
+                        exchange.sendResponseHeaders(400, errorResponse.getBytes().length);  // 400 Bad Request
+                        try (OutputStream os = exchange.getResponseBody()) {
+                            os.write(errorResponse.getBytes());
+                        }
+                        return;
+                    }
+
+                    // Extragem datele necesare din requestData
+                    String sourceCounty = (String) requestData.get("sourceCounty");
+                    String sourceCity = (String) requestData.get("sourceCity");
+                    String targetCounty = (String) requestData.get("targetCounty");
+                    String targetCity = (String) requestData.get("targetCity");
+                    Integer quantity = (Integer) requestData.get("quantity");
+
+                    // Verificăm dacă există valori valabile pentru toate câmpurile
+                    if (sourceCounty == null || sourceCity == null || targetCounty == null || targetCity == null || quantity == null) {
+                        String errorResponse = "{\"message\": \"Missing required fields\"}";
+                        exchange.getResponseHeaders().set("Content-Type", "application/json");
+                        exchange.sendResponseHeaders(400, errorResponse.getBytes().length);  // 400 Bad Request
+                        try (OutputStream os = exchange.getResponseBody()) {
+                            os.write(errorResponse.getBytes());
+                        }
+                        return;
+                    }
+
+                    // Instanțiem emulatorul și trimitem notificarea de dispatch
+                    emulatorNetworkingFire.sendDispatchNotification(sourceCounty, sourceCity, targetCounty, targetCity, quantity);
+                    emulatorService.deleteFromPending(targetCounty, targetCity, quantity, "Medical");
+
+                    // Pregătim răspunsul
+                    String jsonResponse = "{\"message\": \"Dispatch received successfully\"}";
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);  // 200 OK
+
+                    // Trimitim răspunsul înapoi clientului
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(jsonResponse.getBytes());
+                    }
+                } else {
+                    // Dacă metoda nu este POST, returnăm un mesaj de eroare
+                    String errorResponse = "{\"message\": \"Only POST method is supported for this endpoint\"}";
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(405, errorResponse.getBytes().length);  // 405 Method Not Allowed
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(errorResponse.getBytes());
+                    }
+                }
+            }
+        });
+
 
         // Pornește serverul
         server.setExecutor(null);

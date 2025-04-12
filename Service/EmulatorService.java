@@ -11,24 +11,38 @@ import java.util.List;
 import java.util.Map;
 
 public class EmulatorService {
-    EmulatorNetworking emulatorNetworking = new EmulatorNetworking();
-    EmulatorNetworkingAmbulances emulatorNetworkingAmbulances = new EmulatorNetworkingAmbulances();
-    EmulatorNetworkingPolice emulatorNetworkingPolice = new EmulatorNetworkingPolice();
-    EmulatorNetworkingFire emulatorNetworkingFire = new EmulatorNetworkingFire();
-    List<Map<String, Object>> emergenciesForFrontend = new ArrayList<>();
+    private final EmulatorNetworking emulatorNetworking;
+    private final EmulatorNetworkingAmbulances emulatorNetworkingAmbulances;
+    private final EmulatorNetworkingPolice emulatorNetworkingPolice;
+    private final EmulatorNetworkingFire emulatorNetworkingFire;
+    private List<Map<String, Object>> emergenciesForFrontend;
+    private List<Map<String, Object>> pendingEmergenciesForFrontend;
     boolean finished;
-
-    public EmulatorService(){
+    int i = 0;
+    public EmulatorService(EmulatorNetworking emulatorNetworking, EmulatorNetworkingAmbulances emulatorNetworkingAmbulances, EmulatorNetworkingPolice emulatorNetworkingPolice, EmulatorNetworkingFire emulatorNetworkingFire){
+        this.emulatorNetworking = emulatorNetworking;
+        this.emulatorNetworkingAmbulances = emulatorNetworkingAmbulances;
+        this.emulatorNetworkingPolice = emulatorNetworkingPolice;
+        this.emulatorNetworkingFire = emulatorNetworkingFire;
+        emergenciesForFrontend = new ArrayList<>();
+        pendingEmergenciesForFrontend = new ArrayList<>();
         finished = false;
-    }
 
+        try {
+            emulatorNetworking.resetSimulation("default", 500, 100);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public Map<String, Object> getNextEmergencyForFrontend() {
         if (!emergenciesForFrontend.isEmpty()) {
-            return emergenciesForFrontend.remove(0); // scoate și returnează primul element
+            Map<String, Object> stringObjectMap = emergenciesForFrontend.remove(0);
+            pendingEmergenciesForFrontend.add(stringObjectMap);
+            return stringObjectMap;
         }
 
-        if (finished) {
+        if (emergenciesForFrontend.isEmpty() && pendingEmergenciesForFrontend.isEmpty()) {
             try {
                 emulatorNetworking.stopSimulation();
             } catch (IOException | InterruptedException e) {
@@ -38,13 +52,58 @@ public class EmulatorService {
         return null;
     }
 
-    public int start() throws InterruptedException {
-        try {
-            emulatorNetworking.resetSimulation("default", 500, 100);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+    public void deleteFromPending(String targetCounty, String targetCity, int quantity, String type) {
+        for (Map<String, Object> emergency : pendingEmergenciesForFrontend) {
+            String county = (String) emergency.get("county");
+            String city = (String) emergency.get("city");
+
+            if (county.equals(targetCounty) && city.equals(targetCity)) {
+                // Dacă avem un obiect valid, căutăm tipul de urgență în lista de requests
+                List<Map<String, Object>> requests = (List<Map<String, Object>>) emergency.get("requests");
+
+                for (Map<String, Object> request : requests) {
+                    // Verificăm tipul urgenței și cantitatea
+                    String requestType = (String) request.get("Type");
+                    int requestQuantity = (Integer) request.get("Quantity");
+
+                    // Dacă tipul și cantitatea se potrivesc
+                    if (requestType.equals(type) && requestQuantity >= quantity) {
+                        // Scădem cantitatea
+                        request.put("Quantity", requestQuantity - quantity);
+
+                        // Dacă toate cantitățile sunt 0 pentru Medical, Police și Fire, ștergem obiectul
+                        if (isAllRequestsQuantityZero(requests)) {
+                            pendingEmergenciesForFrontend.remove(emergency);
+                        }
+                        return;  // Am terminat operațiunea
+                    }
+                }
+            }
         }
 
+        if (emergenciesForFrontend.isEmpty() && pendingEmergenciesForFrontend.isEmpty()) {
+            try {
+                emulatorNetworking.stopSimulation();
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    // Verifică dacă toate cantitățile din lista de requests sunt 0
+    private boolean isAllRequestsQuantityZero(List<Map<String, Object>> requests) {
+        for (Map<String, Object> request : requests) {
+            int quantity = (Integer) request.get("Quantity");
+            if (quantity > 0) {
+                return false;  // Dacă găsim o cantitate mai mare de 0, returnăm false
+            }
+        }
+        return true;  // Dacă toate cantitățile sunt 0, returnăm true
+    }
+
+
+
+    public int start() throws InterruptedException {
         List<Map<String, Object>> ambulances;
         try {
             ambulances = emulatorNetworkingAmbulances.getAvailableAmbulances();
@@ -90,8 +149,6 @@ public class EmulatorService {
             }
         }
 
-        finished = true;
-
         return 0;
     }
 
@@ -129,7 +186,7 @@ public class EmulatorService {
 
         double closestDistance = calculateDistance(emergencyLat, emergencyLon, getLatitudeFromMap(ambulances.get(0)), getLongitudeFromMap(ambulances.get(0)));
 
-        if (closestDistance > 0.4) {
+        if (closestDistance > 0.6) {
             emergenciesForFrontend.add(emergency);
             return;
         }
